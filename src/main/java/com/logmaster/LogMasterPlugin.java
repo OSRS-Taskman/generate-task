@@ -4,7 +4,6 @@ import com.google.inject.Provides;
 import com.logmaster.domain.Task;
 import com.logmaster.domain.TaskTier;
 import com.logmaster.synchronization.clog.CollectionLogService;
-import com.logmaster.task.SaveDataStorage;
 import com.logmaster.task.TaskService;
 import com.logmaster.ui.InterfaceManager;
 import com.logmaster.ui.component.TaskOverlay;
@@ -13,7 +12,10 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.SoundEffectID;
-import net.runelite.api.events.*;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
@@ -65,9 +67,6 @@ public class LogMasterPlugin extends Plugin {
 	@Inject
 	public TaskService taskService;
 
-	@Inject
-	public SaveDataStorage saveDataStorage;
-
 	@Getter
 	@Setter
 	// TODO: this is UI state, move it somewhere else
@@ -104,16 +103,6 @@ public class LogMasterPlugin extends Plugin {
 			return;
 		}
 		interfaceManager.updateAfterConfigChange();
-	}
-
-	@Subscribe
-	public void onGameStateChanged(GameStateChanged gameStateChanged) {
-		switch (gameStateChanged.getGameState())
-		{
-			case LOGIN_SCREEN:
-				saveDataStorage.save();
-				break;
-		}
 	}
 
 	@Subscribe

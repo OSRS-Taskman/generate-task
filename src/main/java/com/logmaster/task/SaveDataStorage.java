@@ -37,8 +37,12 @@ public class SaveDataStorage extends EventBusSubscriber {
     @Subscribe
     public void onGameStateChanged(GameStateChanged e) {
         GameState state = e.getGameState();
-        if (state == GameState.LOGGED_IN) {
-            load();
+        switch (state) {
+            case LOGGED_IN:
+                load();
+
+            case LOGIN_SCREEN:
+                save();
         }
     }
 
