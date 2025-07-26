@@ -7,6 +7,7 @@ import com.logmaster.domain.old.OldSaveData;
 import com.logmaster.domain.old.OldTask;
 import com.logmaster.domain.old.OldTaskPointer;
 import com.logmaster.util.EventBusSubscriber;
+import io.github.bhowell2.debouncer.Debouncer;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GameState;
@@ -22,6 +23,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static com.logmaster.LogMasterConfig.*;
 import static com.logmaster.util.GsonOverride.GSON;
@@ -29,8 +31,12 @@ import static com.logmaster.util.GsonOverride.GSON;
 @Singleton
 @Slf4j
 public class SaveDataStorage extends EventBusSubscriber {
+    public static final int SAVE_DEBOUNCE_INTERVAL = 500;
+
     @Inject
     private ConfigManager configManager;
+
+    private final Debouncer<String> saveDebouncer = new Debouncer<>(1);
 
     private SaveData data;
 
@@ -42,7 +48,7 @@ public class SaveDataStorage extends EventBusSubscriber {
                 load();
 
             case LOGIN_SCREEN:
-                save();
+                saveImmediately();
         }
     }
 
@@ -51,6 +57,15 @@ public class SaveDataStorage extends EventBusSubscriber {
     }
 
     public void save() {
+        saveDebouncer.addRunLast(
+                SAVE_DEBOUNCE_INTERVAL,
+                TimeUnit.MILLISECONDS,
+                "save",
+                (k) -> saveImmediately()
+        );
+    }
+
+    public void saveImmediately() {
         String json = GSON.toJson(data);
         this.configManager.setRSProfileConfiguration(CONFIG_GROUP, SAVE_DATA_KEY, json);
     }

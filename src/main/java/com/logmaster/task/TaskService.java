@@ -161,6 +161,8 @@ public class TaskService extends EventBusSubscriber {
         if (taskId.equals(activeTask.getId())) {
             data.setActiveTaskPointer(null);
         }
+
+        saveDataStorage.save();
     }
 
     public void uncomplete(String taskId) {
@@ -168,6 +170,8 @@ public class TaskService extends EventBusSubscriber {
         var progressMap = data.getProgress();
         var tierProgress = progressMap.get(getTaskTier(taskId));
         tierProgress.remove(taskId);
+
+        saveDataStorage.save();
     }
 
     public void toggleComplete(String taskId) {
