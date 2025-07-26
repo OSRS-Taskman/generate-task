@@ -3,7 +3,7 @@ package com.logmaster.ui.component;
 import com.logmaster.LogMasterConfig;
 import com.logmaster.LogMasterPlugin;
 import com.logmaster.domain.Task;
-import com.logmaster.persistence.SaveDataManager;
+import com.logmaster.domain.TaskTier;
 import com.logmaster.synchronization.SyncService;
 import com.logmaster.task.TaskService;
 import com.logmaster.ui.generic.UIButton;
@@ -19,6 +19,7 @@ import net.runelite.api.widgets.WidgetType;
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
+import java.util.Map;
 
 import static com.logmaster.LogMasterPlugin.getCenterX;
 import static com.logmaster.LogMasterPlugin.getCenterY;
@@ -49,10 +50,8 @@ public class TaskDashboard extends UIPage {
     private LogMasterPlugin plugin;
 
     private LogMasterConfig config;
-
-    private final TaskService taskService;
-    private final SaveDataManager saveDataManager;
     private final SyncService syncService;
+    private final TaskService taskService;
 
     private UILabel title;
     private UILabel taskLabel;
@@ -66,13 +65,12 @@ public class TaskDashboard extends UIPage {
     private UIButton faqBtn;
     private UIButton syncBtn;
 
-    public TaskDashboard(LogMasterPlugin plugin, LogMasterConfig config, Widget window, TaskService taskService, SaveDataManager saveDataManager, SyncService syncService) {
+    public TaskDashboard(LogMasterPlugin plugin, LogMasterConfig config, Widget window, SyncService syncService, TaskService taskService) {
         this.window = window;
         this.plugin = plugin;
         this.config = config;
-        this.taskService = taskService;
-        this.saveDataManager = saveDataManager;
         this.syncService = syncService;
+        this.taskService = taskService;
 
         createTaskDetails();
 
@@ -186,12 +184,17 @@ public class TaskDashboard extends UIPage {
     }
 
     public void updatePercentages() {
-        if (this.plugin != null && taskService.completionPercentages(saveDataManager.getSaveData()) != null && this.plugin.getCurrentTier() != null) {
-            Integer percentage = taskService.completionPercentages(saveDataManager.getSaveData()).get(this.plugin.getCurrentTier());
-            if (percentage != null) {
-                this.percentCompletion.setText("<col=" + getCompletionColor(percentage) + ">" + percentage + "%</col> " + this.plugin.getCurrentTier().displayName + " Completed");
-            }
-        }
+        Map<TaskTier, Float> progress = taskService.getProgress();
+        TaskTier currentTier = taskService.getCurrentTier();
+        float tierPercentage = progress.get(currentTier);
+
+        String text = String.format(
+                "<col=%s>%d%%</col> %s Completed",
+                getCompletionColor(tierPercentage),
+                (int) tierPercentage,
+                currentTier.displayName
+        );
+        percentCompletion.setText(text);
     }
 
     private String getCompletionColor(double percent) {

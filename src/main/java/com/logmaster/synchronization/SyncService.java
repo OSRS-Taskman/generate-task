@@ -60,7 +60,7 @@ public class SyncService {
     public void sync() {
         int updatedCount = 0;
         for (TaskTier tier : TaskTier.values()) {
-            for (Task task : taskService.getTaskList().getForTier(tier)) {
+            for (Task task : taskService.getTierTasks(tier)) {
                 Boolean isVerified = syncService.verify(task);
                 if (isVerified == null) {
                     continue;
