@@ -1,5 +1,6 @@
 package com.logmaster.synchronization.clog;
 
+import com.logmaster.util.EventBusSubscriber;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -9,7 +10,6 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.gameval.VarbitID;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -21,10 +21,7 @@ import javax.inject.Singleton;
 // Code from: RuneProfile
 // Repository: https://github.com/ReinhardtR/runeprofile-plugin
 // License: BSD 2-Clause License
-public class CollectionLogWidgetSubscriber {
-    @Inject
-    private EventBus eventBus;
-
+public class CollectionLogWidgetSubscriber extends EventBusSubscriber {
     @Inject
     private Client client;
 
@@ -34,14 +31,6 @@ public class CollectionLogWidgetSubscriber {
     private int tickCollectionLogScriptFired = -1;
 
     private boolean isAutoClogRetrieval = false;
-
-    public void startUp() {
-        eventBus.register(this);
-    }
-
-    public void shutDown() {
-        eventBus.unregister(this);
-    }
 
     public void reset() {
         isAutoClogRetrieval = false;
