@@ -1,9 +1,9 @@
 package com.logmaster.synchronization.clog;
 
+import com.logmaster.util.EventBusSubscriber;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -13,24 +13,21 @@ import java.util.Set;
 
 @Slf4j
 @Singleton
-public class CollectionLogService {
-    @Inject
-    private EventBus eventBus;
-
+public class CollectionLogService extends EventBusSubscriber {
 	@Inject
 	public CollectionLogWidgetSubscriber collectionLogWidgetSubscriber;
 
     private final Set<Integer> obtainedItems = new HashSet<>();
 
     public void startUp() {
-        eventBus.register(this);
+        super.startUp();
         collectionLogWidgetSubscriber.startUp();
 
         reset();
     }
 
     public void shutDown() {
-        eventBus.unregister(this);
+        super.startUp();
         collectionLogWidgetSubscriber.shutDown();
     }
 

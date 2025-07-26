@@ -1,8 +1,8 @@
 package com.logmaster.ui.component;
 
 import com.logmaster.LogMasterConfig;
+import com.logmaster.LogMasterPlugin;
 import com.logmaster.domain.TaskTier;
-import com.logmaster.persistence.SaveDataManager;
 import com.logmaster.ui.generic.UIButton;
 import com.logmaster.ui.generic.UIGraphic;
 import net.runelite.api.widgets.Widget;
@@ -15,8 +15,8 @@ import static com.logmaster.ui.InterfaceConstants.*;
 
 public class TabManager {
     private final LogMasterConfig config;
-    private final SaveDataManager saveDataManager;
     private final Widget window;
+    private final LogMasterPlugin plugin;
     
     private List<UIButton> tabs;
     private UIButton taskDashboardTab;
@@ -25,10 +25,10 @@ public class TabManager {
     private TaskList taskList;
     private UIGraphic divider;
 
-    public TabManager(Widget window, LogMasterConfig config, SaveDataManager saveDataManager) {
+    public TabManager(Widget window, LogMasterConfig config, LogMasterPlugin plugin) {
         this.window = window;
         this.config = config;
-        this.saveDataManager = saveDataManager;
+        this.plugin = plugin;
         
         createTabs();
         createDivider();
@@ -145,7 +145,7 @@ public class TabManager {
                 if (tabs == null) {
                     return;
                 }
-                if (this.saveDataManager.getSaveData().getSelectedTier() == tier && !this.taskDashboard.isVisible()) {
+                if (plugin.getSelectedTier() == tier && !this.taskDashboard.isVisible()) {
                     tabs.get(tabIndex).setSprites(tier.tabSpriteHoverId);
                 } else {
                     tabs.get(tabIndex).setSprites(tier.tabSpriteId, tier.tabSpriteHoverId);
@@ -164,10 +164,9 @@ public class TabManager {
 
     private void activateTaskListForTier(TaskTier tier, int tabIndex) {
         taskDashboardTab.setSprites(DASHBOARD_TAB_SPRITE_ID, DASHBOARD_TAB_HOVER_SPRITE_ID);
-        if (this.saveDataManager.getSaveData().getSelectedTier() != tier) {
+        if (plugin.getSelectedTier() != tier) {
             this.taskList.goToTop();
-            this.saveDataManager.getSaveData().setSelectedTier(tier);
-            this.saveDataManager.save();
+            plugin.setSelectedTier(tier);
         }
         updateTabs();
         tabs.get(tabIndex).setSprites(tier.tabSpriteHoverId);

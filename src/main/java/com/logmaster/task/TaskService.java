@@ -1,104 +1,226 @@
 package com.logmaster.task;
 
-import com.google.gson.JsonObject;
 import com.logmaster.LogMasterConfig;
-import com.logmaster.domain.SaveData;
-import com.logmaster.domain.Task;
-import com.logmaster.domain.TaskTier;
-import com.logmaster.domain.TieredTaskList;
-import com.logmaster.util.FileUtils;
+import com.logmaster.domain.*;
+import com.logmaster.domain.verification.clog.CollectionLogVerification;
+import com.logmaster.util.EventBusSubscriber;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.Response;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static com.logmaster.util.GsonOverride.GSON;
+import java.util.stream.Stream;
 
 @Singleton
 @Slf4j
-public class TaskService {
-
-    private static final String DEF_FILE_TASKS = "task-list.json";
-
+public class TaskService extends EventBusSubscriber {
     @Inject
     private LogMasterConfig config;
 
     @Inject
-    private TaskListClient taskListClient;
+    private SaveDataStorage saveDataStorage;
 
-    private TieredTaskList localList;
-    private TieredTaskList remoteList;
-    private boolean requestedRemoteList = false;
+    @Inject
+    private TaskListStorage taskListStorage;
 
-    public TieredTaskList getTaskList() {
-        if (localList == null) {
-            this.localList = FileUtils.loadDefinitionResource(TieredTaskList.class, DEF_FILE_TASKS);
-        }
-        if (remoteList == null && !requestedRemoteList && config.loadRemoteTaskList()) {
-            loadRemoteTaskList();
-        }
-        return remoteList != null && config.loadRemoteTaskList() ? remoteList : localList;
+    @Override
+    public void startUp() {
+        super.startUp();
+        saveDataStorage.startUp();
     }
 
-    public List<Task> getForTier(TaskTier tier) {
-        return getTaskList().getForTier(tier);
+    @Override
+    public void shutDown() {
+        super.shutDown();
+        saveDataStorage.shutDown();
     }
 
-    public Map<TaskTier, Integer> completionPercentages(SaveData saveData) {
-        Map<TaskTier, Set<String>> progressData = saveData.getProgress();
-        TieredTaskList taskList = getTaskList();
+    public Task getActiveTask() {
+        TaskPointer pointer = saveDataStorage.get().getActiveTaskPointer();
+        if (pointer == null) {
+            return null;
+        }
 
-        Map<TaskTier, Integer> completionPercentages = new HashMap<>();
+        return pointer.getTask();
+    }
+
+    public TaskTier getActiveTier() {
+        TaskPointer pointer = saveDataStorage.get().getActiveTaskPointer();
+        if (pointer == null) {
+            return null;
+        }
+
+        return pointer.getTaskTier();
+    }
+
+    public @NonNull TaskTier getCurrentTier() {
+        Map<TaskTier, Float> progress = getProgress();
+
+        return getVisibleTiers().stream()
+                .filter(t -> progress.get(t) < 100)
+                .findFirst()
+                .orElse(TaskTier.MASTER);
+    }
+
+    public List<Task> getTierTasks() {
+        return getTierTasks(getCurrentTier());
+    }
+
+    public List<Task> getTierTasks(TaskTier tier) {
+        return taskListStorage.get().getForTier(tier);
+    }
+
+    public List<Task> getIncompleteTierTasks() {
+        return getIncompleteTierTasks(getCurrentTier());
+    }
+
+    public List<Task> getIncompleteTierTasks(TaskTier tier) {
+        TieredTaskList taskList = taskListStorage.get();
+
+        return taskList.getForTier(tier).stream()
+                .filter(t -> !isComplete(t.getId()))
+                .collect(Collectors.toList());
+    }
+
+    public List<TaskTier> getVisibleTiers() {
+        TaskTier hideBelow = config.hideBelow();
+
+        return Arrays.stream(TaskTier.values())
+                .filter(t -> t.ordinal() >= hideBelow.ordinal())
+                .collect(Collectors.toList());
+    }
+
+    public @NonNull Map<TaskTier, Float> getProgress() {
+        SaveData data = saveDataStorage.get();
+        TieredTaskList taskList = taskListStorage.get();
+
+        Set<String> completedTasks = data.getProgress().entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream())
+                .collect(Collectors.toSet());
+
+        Map<TaskTier, Float> completionPercentages = new HashMap<>();
         for (TaskTier tier : TaskTier.values()) {
-            Set<String> tierCompletedTasks = new HashSet<>(progressData.get(tier));
-            Set<String> tierTaskIdList = taskList.getForTier(tier)
-                    .stream()
+            Set<String> tierTasks = taskList.getForTier(tier).stream()
                     .map(Task::getId)
                     .collect(Collectors.toSet());
 
-            tierCompletedTasks.retainAll(tierTaskIdList);
+            int totalTierTasks = tierTasks.size();
+            tierTasks.retainAll(completedTasks);
 
-            double tierPercentage = 100d * tierCompletedTasks.size() / tierTaskIdList.size();
+            float tierPercentage = 100f * tierTasks.size() / totalTierTasks;
 
-            completionPercentages.put(tier, (int) Math.floor(tierPercentage));
+            completionPercentages.put(tier, tierPercentage);
         }
 
         return completionPercentages;
     }
 
-    private void loadRemoteTaskList() {
-        requestedRemoteList = true;
-        // Load the remote task list
-        try {
-            taskListClient.getTaskList(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    log.error("Unable to load remote task list, will defer to the default task list", e);
-                    requestedRemoteList = false;
-                }
+    public Task generate() {
+        SaveData data = saveDataStorage.get();
 
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                    JsonObject tasksJson = taskListClient.processResponse(response);
-                    response.close();
-                    if (tasksJson == null) {
-                        log.error("Loaded null remote task list, will defer to the default task list");
-                        return;
-                    }
-                    log.debug("Loaded remote task list!");
-                    remoteList = GSON.fromJson(tasksJson, TieredTaskList.class);
-                }
-            });
-        } catch (IOException e) {
-            log.error("Unable to load remote task list, will defer to the default task list");
-            this.localList = FileUtils.loadDefinitionResource(TieredTaskList.class, DEF_FILE_TASKS);
+        TaskPointer pointer = data.getActiveTaskPointer();
+        if (pointer != null) {
+            log.warn("Tried to generate task when previous one wasn't completed yet");
+            return null;
+        }
+
+        TaskTier currentTier = getCurrentTier();
+        List<Task> incompleteTierTasks = getIncompleteTierTasks(currentTier);
+        if (incompleteTierTasks.isEmpty()) {
+            log.warn("No tasks left");
+            return null;
+        }
+
+        Task generatedTask = pickRandomTask(incompleteTierTasks);
+        log.debug("New task generated: {}", generatedTask);
+
+        data.setActiveTaskPointer(new TaskPointer(currentTier, generatedTask));
+        saveDataStorage.save();
+
+        return generatedTask;
+    }
+
+    public void complete() {
+        Task activeTask = getActiveTask();
+        if (activeTask == null) {
+            return;
+        }
+
+        complete(activeTask.getId());
+    }
+
+    public void complete(String taskId) {
+        SaveData data = saveDataStorage.get();
+        var progressMap = data.getProgress();
+        var tierProgress = progressMap.get(getTaskTier(taskId));
+        tierProgress.add(taskId);
+
+        Task activeTask = getActiveTask();
+        if (taskId.equals(activeTask.getId())) {
+            data.setActiveTaskPointer(null);
         }
     }
+
+    public void uncomplete(String taskId) {
+        SaveData data = saveDataStorage.get();
+        var progressMap = data.getProgress();
+        var tierProgress = progressMap.get(getTaskTier(taskId));
+        tierProgress.remove(taskId);
+    }
+
+    public void toggleComplete(String taskId) {
+        if (isComplete(taskId)) {
+            uncomplete(taskId);
+        } else {
+            complete(taskId);
+        }
+    }
+
+    public boolean isComplete(String taskId) {
+        SaveData data = saveDataStorage.get();
+        var progressMap = data.getProgress();
+        var tierProgress = progressMap.get(getTaskTier(taskId));
+
+        return tierProgress.contains(taskId);
+    }
+
+    // TODO: this is "slow" but it's in preparation for a future refactor;
+    //  it won't be necessary in the future; we could build a cache if that's an issue
+    private @NonNull TaskTier getTaskTier(String taskId) {
+        TieredTaskList taskList = taskListStorage.get();
+
+        for (TaskTier tier : TaskTier.values()) {
+            List<Task> tierTasks = taskList.getForTier(tier);
+            boolean isTaskInTier = tierTasks.stream().anyMatch(t -> t.getId().equals(taskId));
+
+            if (isTaskInTier) {
+                return tier;
+            }
+        }
+
+        String msg = String.format("Can't retrieve tier for task with id %s", taskId);
+        throw new RuntimeException(msg);
+    }
+
+    private Task pickRandomTask(List<Task> tasks) {
+		int index = (int) Math.floor(Math.random() * tasks.size());
+		Task pickedTask = tasks.get(index);
+
+		if (!(pickedTask.getVerification() instanceof CollectionLogVerification)) {
+			return pickedTask;
+		}
+
+		// get first of similarly named tasks
+		String taskName = pickedTask.getName();
+		Stream<Task> similarTasks = tasks.stream()
+				.filter(t -> taskName.equals(t.getName()))
+				.filter(t -> t.getVerification() instanceof CollectionLogVerification);
+
+		return similarTasks.min(Comparator.comparingInt(
+			t -> ((CollectionLogVerification) t.getVerification()).getCount()
+		)).orElse(pickedTask);
+	}
+
 }

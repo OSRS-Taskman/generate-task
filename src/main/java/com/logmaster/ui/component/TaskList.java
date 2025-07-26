@@ -4,10 +4,8 @@ import com.logmaster.LogMasterConfig;
 import com.logmaster.LogMasterPlugin;
 import com.logmaster.domain.DynamicTaskImages;
 import com.logmaster.domain.Task;
-import com.logmaster.domain.TaskPointer;
 import com.logmaster.domain.TaskTier;
 import com.logmaster.domain.verification.clog.CollectionLogVerification;
-import com.logmaster.persistence.SaveDataManager;
 import com.logmaster.synchronization.clog.CollectionLogService;
 import com.logmaster.task.TaskService;
 import com.logmaster.ui.generic.UIButton;
@@ -51,12 +49,10 @@ public class TaskList extends UIPage {
     
 
     private final Widget window;
-    private final TaskService taskService;
     private final LogMasterPlugin plugin;
     private final ClientThread clientThread;
     private final CollectionLogService collectionLogService;
-
-    private final SaveDataManager saveDataManager;
+    private final TaskService taskService;
 
     private Rectangle bounds = new Rectangle();
 
@@ -89,14 +85,13 @@ public class TaskList extends UIPage {
 
     private final LogMasterConfig config;
 
-    public TaskList(Widget window, TaskService taskService, LogMasterPlugin plugin, ClientThread clientThread, SaveDataManager saveDataManager, LogMasterConfig config, CollectionLogService collectionLogService) {
+    public TaskList(Widget window, LogMasterPlugin plugin, ClientThread clientThread, LogMasterConfig config, CollectionLogService collectionLogService, TaskService taskService) {
         this.window = window;
-        this.taskService = taskService;
         this.plugin = plugin;
         this.clientThread = clientThread;
-        this.saveDataManager = saveDataManager;
         this.config = config;
         this.collectionLogService = collectionLogService;
+        this.taskService = taskService;
 
         updateBounds();
 
@@ -167,7 +162,7 @@ public class TaskList extends UIPage {
             relevantTier = TaskTier.MASTER;
         }
         int tasksToShowCount = tasksPerPage * columns;
-        totalTasks = taskService.getTaskList().getForTier(relevantTier).size();
+        totalTasks = taskService.getTierTasks(relevantTier).size();
         if (dir != 0) {
             int newIndex = topTaskIndex + (dir * columns);
             topTaskIndex = Math.min(Math.max(0, totalTasks - tasksToShowCount), Math.max(0, newIndex));
@@ -216,13 +211,8 @@ public class TaskList extends UIPage {
                 taskBg.getWidget().setPos(taskX, taskY);
                 boolean taskCompleted = plugin.isTaskCompleted(task.getId(), finalRelevantTier);
 
-                // Set our background sprite based on task state
-                TaskPointer activeTaskPointer = saveDataManager.getSaveData().getActiveTaskPointer();
-                if (
-                    activeTaskPointer != null
-                    && activeTaskPointer.getTaskTier() == relevantTier
-                    && activeTaskPointer.getTask().getId().equals(task.getId())
-                ) {
+                Task activeTask = taskService.getActiveTask();
+                if (activeTask != null && activeTask.getId().equals(task.getId())) {
                     taskBg.setSprite(TASK_CURRENT_BACKGROUND_SPRITE_ID);
                 } else if (taskCompleted) {
                     taskBg.setSprite(TASK_COMPLETE_BACKGROUND_SPRITE_ID);
@@ -335,7 +325,7 @@ public class TaskList extends UIPage {
     // Overload getTasksToShow to accept a count
     private List<Task> getTasksToShow(TaskTier relevantTier, int topTaskIndex, int count) {
         List<Task> tasksToShow = new ArrayList<>();
-        List<Task> taskList = taskService.getTaskList().getForTier(relevantTier);
+        List<Task> taskList = taskService.getTierTasks(relevantTier);
         for (int i = 0; i < count; i++) {
             if (topTaskIndex + i >= taskList.size()) break;
             tasksToShow.add(taskList.get(topTaskIndex + i));
@@ -411,7 +401,7 @@ public class TaskList extends UIPage {
             if (relevantTier == null) {
                 relevantTier = TaskTier.MASTER;
             }
-            int maxTopIndex = Math.max(0, taskService.getTaskList().getForTier(relevantTier).size() - tasksPerPage);
+            int maxTopIndex = Math.max(0, taskService.getTierTasks(relevantTier).size() - tasksPerPage);
             topTaskIndex = Math.min(topTaskIndex, maxTopIndex);
         }
         updateArrowPositions();

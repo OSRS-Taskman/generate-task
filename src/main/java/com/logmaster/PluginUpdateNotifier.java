@@ -1,5 +1,6 @@
 package com.logmaster;
 
+import com.logmaster.util.EventBusSubscriber;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.GameState;
@@ -7,7 +8,6 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -21,7 +21,7 @@ import static com.logmaster.LogMasterConfig.PLUGIN_VERSION_KEY;
 
 @Slf4j
 @Singleton
-public class PluginUpdateNotifier {
+public class PluginUpdateNotifier extends EventBusSubscriber {
     private static final String PLUGIN_VERSION_TOKEN = "%PLUGIN_VERSION%";
 
     private static final String UPDATE_MESSAGE =
@@ -29,21 +29,10 @@ public class PluginUpdateNotifier {
             + "<colHIGHLIGHT>- Added task synchronization";
 
     @Inject
-    EventBus eventBus;
-
-    @Inject
     ConfigManager configManager;
 
     @Inject
     ChatMessageManager chatMessageManager;
-
-    public void startUp() {
-        eventBus.register(this);
-    }
-
-    public void shutDown() {
-        eventBus.unregister(this);
-    }
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged gameStateChanged) {

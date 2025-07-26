@@ -3,9 +3,7 @@ package com.logmaster.ui;
 import com.logmaster.LogMasterConfig;
 import com.logmaster.LogMasterPlugin;
 import com.logmaster.domain.Task;
-import com.logmaster.domain.TaskPointer;
 import com.logmaster.domain.TaskTier;
-import com.logmaster.persistence.SaveDataManager;
 import com.logmaster.synchronization.SyncService;
 import com.logmaster.synchronization.clog.CollectionLogService;
 import com.logmaster.task.TaskService;
@@ -30,7 +28,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.logmaster.ui.InterfaceConstants.DEF_FILE_SPRITES;
@@ -52,19 +49,16 @@ public class InterfaceManager implements MouseListener, MouseWheelListener {
     private LogMasterPlugin plugin;
 
     @Inject
-    private TaskService taskService;
-
-    @Inject
     private SpriteManager spriteManager;
-
-    @Inject
-    private SaveDataManager saveDataManager;
 
     @Inject
     private CollectionLogService collectionLogService;
 
     @Inject
     private SyncService syncService;
+
+    @Inject
+    private TaskService taskService;
 
     public TaskDashboard taskDashboard;
     private TaskList taskList;
@@ -83,7 +77,10 @@ public class InterfaceManager implements MouseListener, MouseWheelListener {
             if (tabManager != null) {
                 tabManager.updateTabs();
             }
-            if (this.saveDataManager.getSaveData().getSelectedTier() != null && Arrays.asList(TaskTier.values()).indexOf(this.saveDataManager.getSaveData().getSelectedTier()) < Arrays.asList(TaskTier.values()).indexOf(this.config.hideBelow())) {
+
+            List<TaskTier> visibleTiers = taskService.getVisibleTiers();
+            TaskTier activeTier = plugin.getSelectedTier();
+            if (activeTier != null && visibleTiers.contains(activeTier)) {
                 if (tabManager != null) {
                     tabManager.activateTaskDashboard();
                 }
@@ -221,17 +218,17 @@ public class InterfaceManager implements MouseListener, MouseWheelListener {
     }
 
     private void createTabManager(Widget window) {
-        this.tabManager = new TabManager(window, config, saveDataManager);
+        this.tabManager = new TabManager(window, config, plugin);
         this.tabManager.setComponents(taskDashboard, taskList);
     }
 
     private void createTaskDashboard(Widget window) {
-        this.taskDashboard = new TaskDashboard(plugin, config, window, taskService, saveDataManager, syncService);
+        this.taskDashboard = new TaskDashboard(plugin, config, window, syncService, taskService);
         this.taskDashboard.setVisibility(false);
     }
 
     private void createTaskList(Widget window) {
-        this.taskList = new TaskList(window, taskService, plugin, clientThread, this.saveDataManager, config, collectionLogService);
+        this.taskList = new TaskList(window, plugin, clientThread, config, collectionLogService, taskService);
         this.taskList.setVisibility(false);
     }
 
@@ -264,12 +261,12 @@ public class InterfaceManager implements MouseListener, MouseWheelListener {
     private void toggleTaskDashboard(UIDropdownOption src) {
         if(this.taskDashboard == null) return;
 
-        TaskPointer activeTaskPointer = saveDataManager.getSaveData().getActiveTaskPointer();
-        if (activeTaskPointer != null) {
-            this.taskDashboard.setTask(activeTaskPointer.getTask().getName(), activeTaskPointer.getTask().getDisplayItemId(), null);
+        Task activeTask = taskService.getActiveTask();
+        if (activeTask != null) {
+            this.taskDashboard.setTask(activeTask.getName(), activeTask.getDisplayItemId(), null);
             this.taskDashboard.disableGenerateTask();
         } else {
-            plugin.nullCurrentTask();
+            clearCurrentTask();
         }
 
         boolean enabled = isTaskDashboardEnabled();
@@ -323,9 +320,5 @@ public class InterfaceManager implements MouseListener, MouseWheelListener {
         this.taskDashboard.setTask("No task.", -1, null);
         this.taskDashboard.enableGenerateTask();
         this.taskDashboard.enableFaqButton();
-    }
-
-    public void disableGenerateTaskButton() {
-        this.taskDashboard.disableGenerateTask();
     }
 }

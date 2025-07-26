@@ -1,4 +1,4 @@
-package com.logmaster.persistence;
+package com.logmaster.task;
 
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
@@ -6,9 +6,13 @@ import com.logmaster.domain.*;
 import com.logmaster.domain.old.OldSaveData;
 import com.logmaster.domain.old.OldTask;
 import com.logmaster.domain.old.OldTaskPointer;
+import com.logmaster.util.EventBusSubscriber;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -24,28 +28,34 @@ import static com.logmaster.util.GsonOverride.GSON;
 
 @Singleton
 @Slf4j
-public class SaveDataManager {
+public class SaveDataStorage extends EventBusSubscriber {
     @Inject
     private ConfigManager configManager;
 
-    private SaveData saveData;
+    private SaveData data;
 
-    public @NonNull SaveData getSaveData() {
-        this.saveData = loadSaveData();
-        return this.saveData;
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged e) {
+        GameState state = e.getGameState();
+        if (state == GameState.LOGGED_IN) {
+            load();
+        }
+    }
+
+    public SaveData get() {
+        return data;
     }
 
     public void save() {
-        String json = GSON.toJson(this.saveData);
+        String json = GSON.toJson(data);
         this.configManager.setRSProfileConfiguration(CONFIG_GROUP, SAVE_DATA_KEY, json);
     }
 
-    public Task currentTask() {
-        TaskPointer activeTaskPointer = getSaveData().getActiveTaskPointer();
-        return activeTaskPointer != null ? activeTaskPointer.getTask() : null;
+    private void load() {
+        data = read();
     }
 
-    private SaveData loadSaveData() {
+    private @NonNull SaveData read() {
         String json = this.configManager.getRSProfileConfiguration(CONFIG_GROUP, SAVE_DATA_KEY);
         if (json == null) {
             return new SaveData();
@@ -66,6 +76,7 @@ public class SaveDataManager {
     }
 
     @SuppressWarnings("deprecation")
+    // TODO: all logic related to updating saves will be moved to dedicated file
     private SaveData update(String json) {
         SaveData updated = new SaveData();
 
