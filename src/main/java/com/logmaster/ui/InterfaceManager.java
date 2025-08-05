@@ -109,6 +109,19 @@ public class InterfaceManager extends EventBusSubscriber implements MouseListene
 			return;
 		}
 
+        // Refresh our rerolls when the config changes to be the amount set in our increments
+        if (e.getKey().equals(LogMasterConfig.REROLLS_ENABLED_KEY)) {
+            if (config.rerollsEnabled()) {
+                taskService.setRerolls(config.rerollsIncrement() > 0 ? Math.min(config.rerollsIncrement(), config.rerollsMaximum()) : config.rerollsMaximum());
+            } else {
+                taskService.setRerolls(0);
+            }
+            if (this.taskDashboard != null) {
+                this.taskDashboard.updateRerolls();
+            }
+            return;
+        }
+
         if (!isTaskDashboardEnabled() || this.taskDashboard == null || this.tabManager == null) {
             return;
         }

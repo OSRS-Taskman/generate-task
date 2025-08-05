@@ -22,4 +22,7 @@ public class SaveData extends BaseSaveData {
 
     @Setter
     private @Nullable Task activeTask = null;
+
+    @Setter
+    private int rerolls = 0;
 }
