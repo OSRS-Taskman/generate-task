@@ -2785,7 +2785,7 @@
 			"shortName": "Earth Emerald",
 			"tip": "Obtained as a drop from Molanisks. Remember your light source and your slayer bell.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Earth_emerald",
-			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Earth_emerald_detail.png/320px-Earth_emerald_detail.pngg",
+			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Earth_emerald_detail.png/320px-Earth_emerald_detail.png",
 			"displayItemId": 34416,
 			"verification": {
 				"method": "collection-log",
@@ -5874,8 +5874,8 @@
 		},
 		{
 			"id": "bc2a8bdc-c562-480d-bca7-ea8727114dbe",
-			"name": "Get a Heat-proof vessel",
-			"shortName": "Heat-proof Ves",
+			"name": "Get a Large water container",
+			"shortName": "Big Gulp",
 			"tip": "Can be purchased as a reward from the Volcanic Mine minigame.",
 			"wikiLink": "https://oldschool.runescape.wiki/w/Volcanic_Mine",
 			"imageLink": "https://oldschool.runescape.wiki/images/thumb/Heat-proof_vessel_detail.png/320px-Heat-proof_vessel_detail.png",
